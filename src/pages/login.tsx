@@ -10,10 +10,29 @@ export default function Login() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const verifyToken = async () => {
+    const user = auth.currentUser;
+
+    if(user) {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/validateToken', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await res.json();
+      console.log('Token validado: ', data);
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
         await signInWithEmailAndPassword(auth, email, password);
+        await verifyToken();
         router.push('/home');
     } catch (error) {
         setError('Email ou senha inválidos.');
