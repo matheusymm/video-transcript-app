@@ -1,14 +1,10 @@
 import admin from 'firebase-admin';
+import credential from '../video-transcript-b010e-firebase-adminsdk-u9kry-efdbcb795b.json'
 
 if(!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.cert({
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') ?? '',
-        }),
+        credential: admin.credential.cert(credential as admin.ServiceAccount),
     });
 }
 
-const adminAuth = admin.auth();
-export { adminAuth };
+export const adminAuth = admin.auth();

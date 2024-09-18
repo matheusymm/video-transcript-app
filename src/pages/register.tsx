@@ -1,21 +1,36 @@
 import { useState } from 'react';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebaseConfig';
 import { useRouter } from 'next/router';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const router = useRouter();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/');
+      const res = await fetch('/api/createUser', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      if(res.ok) {
+        setSuccess('Usuário cadastrado com sucesso!');
+        router.push('/login');
+      }
+      else {
+        const errorMsg  = await res.json();
+        setError(errorMsg.error);
+      }
     } catch (error) {
-      setError('Erro ao criar conta. Tente novamente.');
+      setError('Erro ao tentar cadastrar o usuário.');
     }
   };
 
@@ -40,7 +55,7 @@ export default function Signup() {
           />
         </div>
         <button type="submit">Cadastrar</button>
-        {error && <p>{error}</p>}
+        {success ? success : error && <p>{error}</p>}
       </form>
     </div>
   );

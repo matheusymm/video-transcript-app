@@ -6,14 +6,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Método não permitido' });
   }
 
-  const { email, password, displayName } = req.body;
+  const { email, password } = req.body;
 
   try {
     // Criar usuário no Firebase Authentication
     const user = await adminAuth.createUser({
       email,
       password,
-      displayName,
     });
 
     return res.status(201).json({ user });

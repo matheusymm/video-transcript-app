@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebaseConfig';
 import { useRouter } from 'next/router';
-import { sign } from 'crypto';
 
 export default function Login() {
   const [email, setEmail] = useState('');

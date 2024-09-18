@@ -1,6 +1,5 @@
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebaseConfig';
-// import { withAuth } from '../hoc/withAuth';
 import { useRouter } from 'next/router';
 
 export default function Home() {
@@ -8,7 +7,8 @@ export default function Home() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    router.push('/login');
+    console.log("Logout realizado");
+    router.push("/");
   };
 
   return (
@@ -20,6 +20,4 @@ export default function Home() {
       </div>
     </div>
   );
-}
-
-// export default withAuth(Home);
+};
