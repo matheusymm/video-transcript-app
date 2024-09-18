@@ -1,6 +1,7 @@
 import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/router';
+import { useForm } from 'react-hook-form';
 
 export default function Home() {
   const router = useRouter();
@@ -33,7 +34,40 @@ export default function Home() {
       console.log("Erro na verificação do token. Redirecionando para a página de login.");
       router.push("/login");
     }
-}
+  };
+
+  type FormData = {
+    file: FileList;
+  };
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+
+  const onSubmit = async (data: FormData) => {
+    const formData = new FormData();
+    formData.append('file', data.file[0]);
+
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      console.log("Token não encontrado. Redirecionando para a página de login.");
+      router.push("/login");
+      return;
+    }
+
+    const response = await fetch('/api/createTranscript', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+
+    if(!response.ok) {
+      console.log("Erro no upload do arquivo.", await response.json());
+      return;
+    }
+
+    console.log("Upload realizado com sucesso!", await response.json());
+  }
 
   const handleLogout = async () => {
     // Logout do usuário
@@ -53,6 +87,11 @@ export default function Home() {
         <button onClick={handleLogout}>Logout</button>
         <button onClick={verifyToken}>Token</button>
       </div>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <input type="file" {...register('file')}/>
+        {errors.file && <p>{errors.file.message}</p>}
+        <button type="submit">Upload</button>
+      </form>
     </div>
   );
 };
