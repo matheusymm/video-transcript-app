@@ -8,7 +8,7 @@ export default function Signup() {
   const [success, setSuccess] = useState('');
   const router = useRouter();
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -37,7 +37,7 @@ export default function Signup() {
   return (
     <div>
       <h1>Cadastro</h1>
-      <form onSubmit={handleSignup}>
+      <form onSubmit={handleRegister}>
         <div>
           <input
             type="email"

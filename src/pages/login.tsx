@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebaseConfig';
+import { auth } from '../lib/firebase';
 import { useRouter } from 'next/router';
 
 export default function Login() {
@@ -9,29 +9,21 @@ export default function Login() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const verifyToken = async () => {
-    const user = auth.currentUser;
-
-    if(user) {
-      const token = await user.getIdToken();
-      const res = await fetch('/api/validateToken', {
-        method: 'POST',
-        body: JSON.stringify({ token }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await res.json();
-      console.log('Token validado: ', data);
-    }
-  }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-        await signInWithEmailAndPassword(auth, email, password);
-        await verifyToken();
+        // Autenticação do usuário
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Obtenção do token de autenticação
+        const token = await user.getIdToken();
+
+        // Armazenamento do token no Local Storage
+        localStorage.setItem('token', token);
+        console.log("Login realizado com sucesso!");
+
+        // Redirecionamento para a home
         router.push('/home');
     } catch (error) {
         setError('Email ou senha inválidos.');

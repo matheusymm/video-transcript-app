@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import openaiConfig from "../../lib/openaiConfig";
+import openaiConfig from "../../lib/openai";
 import formidable from "formidable";
 import fs from "fs";
 
