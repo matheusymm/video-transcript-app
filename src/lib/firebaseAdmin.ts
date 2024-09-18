@@ -1,9 +1,16 @@
 import admin from 'firebase-admin';
-import credential from '../video-transcript-b010e-firebase-adminsdk-u9kry-efdbcb795b.json'
+
+const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+if (!serviceAccountKey) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not defined');
+}
+
+const serviceAccount = JSON.parse(serviceAccountKey) as admin.ServiceAccount;
 
 if(!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.cert(credential as admin.ServiceAccount),
+        credential: admin.credential.cert(serviceAccount),
     });
 }
 
