@@ -65,6 +65,42 @@ const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: F
   });
 };
 
+// Função para processar o vídeo de forma assíncrona
+const processVideo = async (transcriptId: number, file: File) => {
+  try {
+    const filePath = file.filepath;
+    const filename = file.originalFilename;
+
+    const audioPath = path.join(path.dirname(filePath), `${filename}.wav`);
+    await convertVideoToAudio(filePath, audioPath);
+
+    const transcription = await openai.audio.transcriptions.create({
+      model: 'whisper-1',
+      file: fs.createReadStream(audioPath),
+      response_format: 'verbose_json',
+      timestamp_granularities: ['word'],
+  });
+
+  await prisma.transcript.update({
+    where: { id: transcriptId }, 
+      data: {
+        status: 'Concluído',
+        text: transcription.text,
+        completedAt: new Date(),
+      }
+  });
+
+  await fsPromises.unlink(filePath);
+  await fsPromises.unlink(audioPath);
+  } catch (error) {
+    console.error('Erro no processamento do vídeo: ', error);
+    await prisma.transcript.update({
+      where: { id: transcriptId },
+      data: { status: 'Erro' },
+    });
+  }
+}
+
 // Função principal para processar e transcrever o vídeo
 export default async function POST(req: NextApiRequest, res: NextApiResponse) {
   if(req.method !== 'POST') {
@@ -101,41 +137,25 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ status: 'fail', error: 'Arquivo não encontrado.' });
     }
 
-    // Converte o vídeo em áudio
-    const audioPath = path.join(path.dirname(filePath), `${filename}.wav`);
-    await convertVideoToAudio(filePath, audioPath);
-
-    // Transcreve o áudio extraído usando a API Whisper da OpenAI
-    const transcription = await openai.audio.transcriptions.create({
-      model: 'whisper-1',
-      file: fs.createReadStream(audioPath),
-      response_format: 'verbose_json',
-      timestamp_granularities: ['word'],
-    });
-
-    // Salva a transcrição no banco de dados
+    // Salva o arquivo no banco de dados
     const savedTranscript = await prisma.transcript.create({
       data: {
         userId: userId,
-        status: 'Concluído',
-        text: transcription.text,
-        name: filename || 'unknown',
-        completedAt: new Date(),
-      }
+        name: filename || 'untitled',
+        status: 'Processando',
+        text: '',
+      },
     });
 
-    // Remove os arquivos temporários
-    await fsPromises.unlink(filePath);
-    await fsPromises.unlink(audioPath);
-
-    // Retorna a transcrição ao frontend
-    res.status(200).json({
-      status: 'success',
-      transcription: transcription.text,
-      savedTranscript,
+    res.status(200).json({ 
+      status: 'processing', 
+      data: savedTranscript 
     });
+
+    setTimeout(() => processVideo(savedTranscript.id, file), 0);
+
   } catch (error) {
-    console.error(error);
+    console.error('Erro ao iniciar o processamento: ', error);
     res.status(500).json({ status: 'fail', error: (error as Error).message });
   }
 }

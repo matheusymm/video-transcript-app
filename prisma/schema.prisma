@@ -25,7 +25,7 @@ model Transcript {
   id          Int       @id @default(autoincrement())
   userId      String
   name        String
-  status      String    @default("processando")
+  status      String    @default("Processando")
   text        String
   completedAt DateTime?
   User        User      @relation(fields: [userId], references: [id])

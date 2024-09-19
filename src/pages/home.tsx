@@ -3,10 +3,9 @@ import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { table } from 'console';
 
 type Transcript = {
-  id: string;
+  id: number;
   name: string;
   status: string;
   transcript: string;
@@ -100,6 +99,48 @@ export default function Home() {
     router.push("/");
   };
 
+  const handleDownload = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    // Faz um GET para obter o arquivo de transcrição
+    const response = await fetch(`/api/downloadTranscript?id=${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    });
+
+    if(!response.ok) {
+      const error = await response.json();
+      console.log("Erro ao baixar o arquivo.", error);
+      return;
+    }
+    
+    // Converte a resposta em um blob (representação binária de um arquivo)
+    const blob = await response.blob();
+
+    // Cria um URL temporário para o download do arquivo
+    const url = window.URL.createObjectURL(blob);
+
+    // Cria um link temporário para o download do arquivo
+    const link = document.createElement('a');
+
+    // Define o link para o arquivo e o atributo de download
+    link.href = url;
+
+    // Define o nome do arquivo para download
+    link.setAttribute('download', `transcript_${id}.txt`);
+
+    // Adiciona o link ao corpo do documento
+    document.body.appendChild(link);
+
+    // Simula o clique no link para iniciar o download
+    link.click();
+
+    // Remove o link do corpo do documento
+    link.remove();
+  }
+
   return (
     <div>
       <h1>Transcritor de Vídeos</h1>
@@ -127,6 +168,7 @@ export default function Home() {
                 <th>Nome</th>
                 <th>Status</th>
                 <th>Data de Conclusão</th>
+                <th>Download</th>
               </tr>
             </thead>
             <tbody>
@@ -134,7 +176,10 @@ export default function Home() {
                 <tr key={transcript.id}>
                   <td>{transcript.name}</td>
                   <td>{transcript.status}</td>
-                  <td>{transcript.completedAt}</td>
+                  <td>{transcript.completedAt ? transcript.completedAt.toLocaleString() : 'Em processamento'}</td>
+                  <td>
+                    <button onClick={() => handleDownload(transcript.id)}>Download</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
