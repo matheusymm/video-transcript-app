@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { adminAuth } from '../../lib/firebaseAdmin';
+import bcrypt from 'bcryptjs';
+import { adminAuth } from '@/lib/firebaseAdmin';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -14,6 +15,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const saltRounds = 10;
+    const encriptedPassword = await bcrypt.hash(password, saltRounds);
     // Criar usuário no Firebase Authentication
     const userCredentials = await adminAuth.createUser({
       email,
@@ -24,8 +27,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const createdUser = await prisma.user.create({
       data: {
         id: userCredentials.uid,
-        email,
-        password,
+        email: email,
+        password: encriptedPassword,
       },
     });
 

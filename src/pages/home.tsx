@@ -1,49 +1,63 @@
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+
+type Transcript = {
+  id: string;
+  name: string;
+  status: string;
+  transcript: string;
+  completedAt: string;
+};
+
+type FormData = {
+  file: FileList;
+};
 
 export default function Home() {
   const router = useRouter();
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+  const [error, setError] = useState<string>('');
 
-  const verifyToken = async() => {
+  const fetchTranscripts = async () => {
     const token = localStorage.getItem('token');
 
     if (!token) {
       console.log("Token não encontrado. Redirecionando para a página de login.");
       router.push("/login");
+      return;
     }
 
+    setLoading(true);
     try {
-      const response = await fetch('/api/verifyToken', {
+      const response = await fetch('/api/getTranscripts', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
         },
       });
 
-      const data = await response.json();
-
-      if(response.ok) {
-        console.log("Token válido.", data);
-      } else {
-        console.log("Erro na verificação do token. Redirecionando para a página de login.");
-        router.push("/login");
+      if(!response.ok) {
+        setError("Erro ao buscar transcrições.");
+        return;
       }
+
+      const data = await response.json();
+      setTranscripts(data);
     } catch (error) {
-      console.log("Erro na verificação do token. Redirecionando para a página de login.");
-      router.push("/login");
+      setError("Erro ao buscar transcrições.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  type FormData = {
-    file: FileList;
-  };
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
-
   const onSubmit = async (data: FormData) => {
     const formData = new FormData();
-    formData.append('file', data.file[0]);
+    formData.append('video', data.file[0]);
 
     const token = localStorage.getItem('token');
 
@@ -85,13 +99,34 @@ export default function Home() {
       <h2>Lista de Transcrições</h2>
       <div>
         <button onClick={handleLogout}>Logout</button>
-        <button onClick={verifyToken}>Token</button>
       </div>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <input type="file" {...register('file')}/>
+        <input 
+          type="file" 
+          {...register('file')}
+          accept='video/*'
+          multiple={false}
+        />
         {errors.file && <p>{errors.file.message}</p>}
         <button type="submit">Upload</button>
       </form>
+      <div>
+        {loading ? (
+          <p>Carregando transcrições...</p>
+        ) : (
+          <ul>
+            {transcripts.map((transcript) => (
+              <li key={transcript.id}>
+                <p>ID: {transcript.id}</p>
+                <p>Nome: {transcript.name}</p>
+                <p>Status: {transcript.status}</p>
+                <p>Data de Conclusão: {transcript.completedAt}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {error && <p>{error}</p>}
+      </div>
     </div>
   );
 };

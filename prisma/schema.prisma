@@ -22,11 +22,11 @@ model User {
 }
 
 model Transcript {
-  id              Int       @id @default(autoincrement())
-  userId          String
-  transcriptionId String
-  videoPath       String
-  status          String    @default("processando")
-  completedAt     DateTime?
-  User            User      @relation(fields: [userId], references: [id])
+  id          Int       @id @default(autoincrement())
+  userId      String
+  name        String
+  status      String    @default("processando")
+  text        String
+  completedAt DateTime?
+  User        User      @relation(fields: [userId], references: [id])
 }
