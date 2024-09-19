@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { adminAuth } from "@/lib/firebaseAdmin";
 
+// Função para verificar o token do usuário
 export const verifyToken = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
     // Obtém o token do cabeçalho da requisição
@@ -12,6 +13,7 @@ export const verifyToken = async (req: NextApiRequest, res: NextApiResponse) => 
 
     // Verifica o token com o Firebase Admin SDK
     const decodedToken = await adminAuth.verifyIdToken(token);
+    
     return decodedToken;
   } catch (error) {
     res.status(401).json({ message: "Token inválido", error: (error as Error).message });

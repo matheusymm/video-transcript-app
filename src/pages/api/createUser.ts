@@ -8,22 +8,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Método não permitido' });
   }
 
+  // Extrair email e senha do corpo da requisição
   const { email, password } = req.body;
-
   if(!email || !password) {
     return res.status(400).json({ error: 'Email e senha são obrigatórios' });
   }
 
   try {
+    // Encripta a senha do usuário
     const saltRounds = 10;
     const encriptedPassword = await bcrypt.hash(password, saltRounds);
+
     // Criar usuário no Firebase Authentication
     const userCredentials = await adminAuth.createUser({
       email,
       password,
     });
 
-    // Criar usuário no banco de dados
+    // Salva o usuário no banco de dados
     const createdUser = await prisma.user.create({
       data: {
         id: userCredentials.uid,

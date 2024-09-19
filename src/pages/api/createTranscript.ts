@@ -9,6 +9,7 @@ import openai from '@/lib/openai';
 import { verifyToken } from '@/lib/verifyToken';
 import prisma from '@/lib/prisma';
 
+// Configura o caminho do FFmpeg
 if(ffmpegPath) {
   ffmpeg.setFfmpegPath(ffmpegPath);
 } else {
@@ -16,14 +17,14 @@ if(ffmpegPath) {
   throw new Error('FFmpeg não encontrado.');
 }
 
-// Desabilitar o bodyParser para usar formidable
+// Desabilitar o bodyParser para usar formidable no processamento da requisicão
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Função para converter video em audio
+// Função para converter video em audio usando FFmpeg
 const convertVideoToAudio = async (videoPath: string, audioPath: string): Promise<void> => {
   return new Promise<void>((resolve, reject) => {
     ffmpeg(videoPath)
@@ -36,9 +37,12 @@ const convertVideoToAudio = async (videoPath: string, audioPath: string): Promis
   });
 };
 
-// Função para parsear o formulário
+// Função para parsear o formulário com formidable
 const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: Files}> => {
+  // Cria um diretório para salvar os arquivos
   const uploadDir = path.join(process.cwd(), 'public/uploads');
+
+  // Configura o objeto IncomingForm
   const form = new IncomingForm({
     uploadDir: uploadDir,
     keepExtensions: true,
@@ -61,6 +65,7 @@ const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: F
   });
 };
 
+// Função principal para processar e transcrever o vídeo
 export default async function POST(req: NextApiRequest, res: NextApiResponse) {
   if(req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -75,17 +80,16 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
     // Processa o formulário e o upload do video usando formidable
     const { files } = await parseForm(req);
     const fileArray = files.video as File[] | undefined;
-
     if (!fileArray || !fileArray.length) {
       return res.status(400).json({ status: 'fail', error: 'Nenhum arquivo enviado.' });
     }
 
+    // Obtém o arquivo do array, no caso é apenas 1 arquivo
     const file = fileArray[0];
 
     // Verifica a extensão do arquivo
     const validExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
     const fileExtension = path.extname(file.originalFilename || '').slice(1).toLowerCase();
-
     if (!validExtensions.includes(fileExtension)) {
       return res.status(400).json({ status: 'fail', error: 'Formato de arquivo não suportado.' });
     }
@@ -93,7 +97,6 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
     // Caminho onde o arquivo foi salvo
     const filePath = file.filepath;
     const filename = file.originalFilename;
-
     if (!filePath) {
       return res.status(400).json({ status: 'fail', error: 'Arquivo não encontrado.' });
     }
@@ -114,7 +117,7 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
     const savedTranscript = await prisma.transcript.create({
       data: {
         userId: userId,
-        status: 'concluído',
+        status: 'Concluído',
         text: transcription.text,
         name: filename || 'unknown',
         completedAt: new Date(),

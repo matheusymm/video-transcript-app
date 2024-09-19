@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { table } from 'console';
 
 type Transcript = {
   id: string;
@@ -55,6 +56,10 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    fetchTranscripts();
+  }, []);
+
   const onSubmit = async (data: FormData) => {
     const formData = new FormData();
     formData.append('video', data.file[0]);
@@ -81,7 +86,9 @@ export default function Home() {
     }
 
     console.log("Upload realizado com sucesso!", await response.json());
-  }
+    fetchTranscripts();
+  };
+
 
   const handleLogout = async () => {
     // Logout do usuário
@@ -114,16 +121,24 @@ export default function Home() {
         {loading ? (
           <p>Carregando transcrições...</p>
         ) : (
-          <ul>
-            {transcripts.map((transcript) => (
-              <li key={transcript.id}>
-                <p>ID: {transcript.id}</p>
-                <p>Nome: {transcript.name}</p>
-                <p>Status: {transcript.status}</p>
-                <p>Data de Conclusão: {transcript.completedAt}</p>
-              </li>
-            ))}
-          </ul>
+          <table border={1}>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Status</th>
+                <th>Data de Conclusão</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transcripts.map((transcript) => (
+                <tr key={transcript.id}>
+                  <td>{transcript.name}</td>
+                  <td>{transcript.status}</td>
+                  <td>{transcript.completedAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
         {error && <p>{error}</p>}
       </div>

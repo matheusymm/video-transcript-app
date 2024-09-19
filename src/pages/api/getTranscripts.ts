@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const decodedToken = await verifyToken(req, res);
     const userId = decodedToken.uid;
 
-    // Busca as transcrições do banco de dados associadas ao usuário
+    // Busca as transcrições do banco de dados associadas ao usuário e ordena de forma decrescente em relação a data de conclusão
     const transcriptions = await prisma.transcript.findMany({
       where: { userId },
       orderBy: { completedAt: 'desc' },
