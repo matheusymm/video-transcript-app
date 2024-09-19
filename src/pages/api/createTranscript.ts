@@ -113,6 +113,19 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
     const decodedToken = await verifyToken(req, res);
     const userId = decodedToken.uid;
 
+    // Verifica se o usuário existe e se a cota de transcrições não foi excedida
+    const user = await prisma.user.findUnique({
+      where: { 
+        id: userId 
+      },
+    });
+    if(!user) {
+      return res.status(404).json({ status: 'fail', error: 'Usuário não encontrado.' });
+    }
+    if(user.quota <= 0) {
+      return res.status(400).json({ status: 'fail', error: 'Cota de transcrições excedida.' });
+    }
+
     // Processa o formulário e o upload do video usando formidable
     const { files } = await parseForm(req);
     const fileArray = files.video as File[] | undefined;
@@ -144,6 +157,16 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
         name: filename || 'untitled',
         status: 'Processando',
         text: '',
+      },
+    });
+
+    // Atualiza a cota do usuário
+    await prisma.user.update({
+      where: { 
+        id: userId 
+      },
+      data: { 
+        quota: user.quota - 1 
       },
     });
 
