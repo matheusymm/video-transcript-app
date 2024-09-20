@@ -17,7 +17,7 @@ model User {
   id          String       @id @default(uuid())
   email       String       @unique
   password    String
-  quota       Int          @default(3) // Exemplo de cota de 5 uploads
+  quota       Int          @default(5) // Exemplo de cota de 5 uploads
   lastUsedAt  DateTime
   transcripts Transcript[]
 }

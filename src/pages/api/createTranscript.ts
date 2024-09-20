@@ -134,15 +134,15 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Atualiza a cota do usuário se o último uso foi há mais de 1 minuto
-    // const minTime = new Date(Date.now() - 24*60*60*1000);
-    const minTime = new Date(Date.now() - 60*1000);
+    const minTime = new Date(Date.now() - 24*60*60*1000);
+    // const minTime = new Date(Date.now() - 60*1000);
     if(user.lastUsedAt && user.lastUsedAt < minTime) {
       await prisma.user.update({
         where: { 
           id: userId 
         },
         data: { 
-          quota: 3,
+          quota: 5,
           lastUsedAt: new Date(),
         },
       });
