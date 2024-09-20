@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
+import Header from './components/Header';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -31,28 +33,38 @@ export default function Login() {
   };
 
   return (
-    <div>
-      <h1>Login</h1>
-      <form onSubmit={handleLogin}>
-        <div className="form-group">
-            <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            />
+    <div className="font-montserrat">
+      <Head>
+        <title>Login</title>
+      </Head>
+      <Header />
+      <div className="flex flex-col justify-top items-center min-h-screen mt-8">
+        <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+          <h2 className="text-2xl text-customBlack mb-4">Login</h2>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="form-group">
+                <input
+                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                />
+            </div>
+            <div className="form-group">   
+                <input
+                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                />
+            </div>
+            <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition font-semibold">Entrar</button>
+            {error && <p>{error}</p>}
+          </form>
         </div>
-        <div className="form-group">   
-            <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            />
-        </div>
-        <button type="submit">Entrar</button>
-        {error && <p>{error}</p>}
-      </form>
+      </div>
     </div>
   );
 }

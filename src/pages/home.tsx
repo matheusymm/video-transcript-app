@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import Head from 'next/head';
+import Header from './components/Header';
 
 type Transcript = {
   id: number;
@@ -80,7 +82,12 @@ export default function Home() {
     });
 
     if(!response.ok) {
-      console.log("Erro no upload do arquivo.", await response.json());
+      const errorData = await response.json();
+      if(response.status === 400 && errorData.error) {
+        setError('Cota de transcrições excedida. Tente novamente outro dia.');
+      } else {
+        setError('Erro ao fazer upload do arquivo.');
+      }
       return;
     }
 
@@ -142,50 +149,55 @@ export default function Home() {
   }
 
   return (
-    <div>
-      <h1>Transcritor de Vídeos</h1>
-      <h2>Lista de Transcrições</h2>
-      <div>
-        <button onClick={handleLogout}>Logout</button>
-      </div>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <input 
-          type="file" 
-          {...register('file')}
-          accept='video/*'
-          multiple={false}
-        />
-        {errors.file && <p>{errors.file.message}</p>}
-        <button type="submit">Upload</button>
-      </form>
-      <div>
-        {loading ? (
-          <p>Carregando transcrições...</p>
-        ) : (
-          <table border={1}>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Status</th>
-                <th>Data de Conclusão</th>
-                <th>Download</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transcripts.map((transcript) => (
-                <tr key={transcript.id}>
-                  <td>{transcript.name}</td>
-                  <td>{transcript.status}</td>
-                  <td>{transcript.completedAt ? transcript.completedAt.toLocaleString() : 'Em processamento'}</td>
-                  <td>
-                    <button onClick={() => handleDownload(transcript.id)}>Download</button>
-                  </td>
+    <div className="font-montserrat">
+      <Head>
+        <title>Home</title>
+      </Head>
+      <Header />
+      <button onClick={handleLogout} className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition font-semibold">Logout</button>
+      <div className="flex flex-col justify-top items-center min-h-screen mt-8">
+      <h2 className="text-2xl text-customBlack mb-4">Upload de Arquivos</h2>
+        <form onSubmit={handleSubmit(onSubmit)} className="mb-8 w-full max-w-md bg-white p-6 rounded-lg shadow-md">
+          <input 
+            type="file" 
+            {...register('file')}
+            accept='video/*'
+            multiple={false}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          />
+          {errors.file && <p>{errors.file.message}</p>}
+          <button type="submit" className="w-full bg-blue-500 text-white py-2 mt-4 rounded-md hover:bg-blue-600 transition font-semibold">Upload</button>
+        </form>
+        <h2 className="text-2xl text-customBlack mb-4">Lista de Transcrições</h2>
+        <div className="w-full max-w-4xl">
+          {loading ? (
+            <p>Carregando transcrições...</p>
+          ) : (
+            <table className="table-auto w-full bg-white shadow-md rounded-lg overflow-hidden">
+              <thead>
+                <tr className="bg-customWhite">
+                  <th className="px-4 py-2">Nome</th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Data de Conclusão</th>
+                  <th className="px-4 py-2">Download</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {error && <p>{error}</p>}
+              </thead>
+              <tbody>
+                {transcripts.map((transcript) => (
+                  <tr key={transcript.id} className="border-t">
+                    <td className="px-4 py-2">{transcript.name}</td>
+                    <td className="px-4 py-2">{transcript.status}</td>
+                    <td className="px-4 py-2">{transcript.completedAt ? transcript.completedAt.toLocaleString() : 'Em processamento'}</td>
+                    <td>
+                      <button onClick={() => handleDownload(transcript.id)} className="w-full bg-blue-500 text-white py-1 rounded-md hover:bg-blue-600 transition font-semibold">Download</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {error && <p className="text-red-500 mt-4">{error}</p>}
+        </div>
       </div>
     </div>
   );
