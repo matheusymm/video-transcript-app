@@ -142,7 +142,7 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
           id: userId 
         },
         data: { 
-          quota: 5,
+          quota: 3,
           lastUsedAt: new Date(),
         },
       });
