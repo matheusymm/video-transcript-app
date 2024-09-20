@@ -193,7 +193,6 @@ export default function Home() {
               </thead>
               <tbody>
               {transcripts
-              .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
               .map((transcript) => (
                 <tr key={transcript.id} className="border-t border-b">
                 <td className="px-4 py-2 border-r">{transcript.name}</td>
