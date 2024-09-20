@@ -9,9 +9,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Extrair email e senha do corpo da requisição
-  const { email, password } = req.body;
+  const { email, password, confirmPassword } = req.body;
   if(!email || !password) {
     return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+  }
+  if(password !== confirmPassword) {
+    return res.status(400).json({ error: 'Senhas diferentes' });
   }
 
   try {

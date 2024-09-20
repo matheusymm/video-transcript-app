@@ -192,13 +192,40 @@ export default function Home() {
               </tr>
               </thead>
               <tbody>
-              {transcripts.map((transcript) => (
+              {transcripts
+              .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+              .map((transcript) => (
                 <tr key={transcript.id} className="border-t border-b">
                 <td className="px-4 py-2 border-r">{transcript.name}</td>
-                <td className="px-4 py-2 border-r">{transcript.status}</td>
-                <td className="px-4 py-2 border-r">{transcript.completedAt ? transcript.completedAt.toLocaleString() : 'Em processamento'}</td>
+                <td className="px-4 py-2 border-r">
+                  {transcript.status === 'Erro' ?
+                  <span>Erro</span>
+                  : transcript.status}
+                </td>
+                <td className="px-4 py-2 border-r">
+                  {transcript.status === 'Erro' ? 
+                  <span>Indefinido</span>
+                  : transcript.completedAt ? 
+                  (
+                    new Date(transcript.completedAt).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })
+                  )
+                  : 'Em processamento'}
+                </td>
                 <td>
-                  <button onClick={() => handleDownload(transcript.id)} className="w-100 bg-blue-500 text-white py-1 rounded-md hover:bg-blue-600 transition font-semibold">Download</button>
+                  {
+                  transcript.status === 'Erro' ?
+                  <span>Indisponível</span>
+                  : transcript.status === 'Processando' ?
+                  <span>Aguarde...</span>
+                  : <button onClick={() => handleDownload(transcript.id)} className="w-100 bg-blue-500 text-white py-1 rounded-md hover:bg-blue-600 transition font-semibold">Download</button>
+                  }  
                 </td>
                 </tr>
               ))}

@@ -4,13 +4,13 @@ import fsPromises from 'node:fs/promises';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
-import {IncomingForm, File, Files, Fields} from 'formidable';
+import { IncomingForm, File, Files, Fields } from 'formidable';
 import openai from '@/lib/openai';
 import { verifyToken } from '@/lib/verifyToken';
 import prisma from '@/lib/prisma';
 
 // Configura o caminho do FFmpeg
-if(ffmpegPath) {
+if (ffmpegPath) {
   ffmpeg.setFfmpegPath(ffmpegPath);
 } else {
   console.error('FFmpeg não encontrado.');
@@ -29,16 +29,16 @@ const convertVideoToAudio = async (videoPath: string, audioPath: string): Promis
   return new Promise<void>((resolve, reject) => {
     ffmpeg(videoPath)
       .noVideo()
-      .audioCodec('libmp3lame')
-      .format('mp3')
+      .audioCodec('pcm_s16le')
+      .format('wav')
       .save(audioPath)
       .on('end', () => resolve())
-      .on('error', (err) => reject(err))
+      .on('error', (err) => reject(err));
   });
 };
 
 // Função para parsear o formulário com formidable
-const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: Files}> => {
+const parseForm = async (req: NextApiRequest): Promise<{ fields: Fields, files: Files }> => {
   // Cria um diretório para salvar os arquivos
   const uploadDir = path.join(process.cwd(), 'public/uploads');
 
@@ -46,7 +46,7 @@ const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: F
   const form = new IncomingForm({
     uploadDir: uploadDir,
     keepExtensions: true,
-    maxFileSize: 50 * 1024 * 1024, // 25MB
+    maxFileSize: 100 * 1024 * 1024, // 100MB
     multiples: false,
   });
 
@@ -65,14 +65,76 @@ const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: F
   });
 };
 
-const whisper = async (audioPath: string) => {
+// Função para dividir o áudio em segmentos de duração específica (em segundos)
+const splitAudio = async (audioPath: string, segmentDuration: number): Promise<string[]> => {
+  return new Promise<string[]>((resolve, reject) => {
+    const outputDir = path.dirname(audioPath);
+    const fileNameWithoutExt = path.parse(audioPath).name;
+    const segmentPattern = path.join(outputDir, `${fileNameWithoutExt}_segment_%03d.wav`);
+
+    ffmpeg(audioPath)
+      .output(segmentPattern)
+      .duration(segmentDuration)
+      .on('end', async () => {
+        try {
+          const files = await fsPromises.readdir(outputDir);
+          const segmentFiles = files
+            .filter(file => file.startsWith(`${fileNameWithoutExt}_segment_`) && file.endsWith('.wav'))
+            .map(file => path.join(outputDir, file))
+            .sort(); // Ordena para manter a sequência correta
+          resolve(segmentFiles);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .on('error', (err) => reject(err))
+      .run();
+  });
+};
+
+// Função para transcrever um segmento de áudio
+const transcribeSegment = async (segmentPath: string): Promise<string> => {
   const transcription = await openai.audio.transcriptions.create({
     model: 'whisper-1',
-    file: fs.createReadStream(audioPath),
-    response_format: 'verbose_json',
-    timestamp_granularities: ['segment'],
+    file: fs.createReadStream(segmentPath),
+    response_format: 'text', // Preferível para concatenação
   });
-  return transcription;
+
+  return transcription.text;
+};
+
+// Função para processar todos os segmentos e combinar as transcrições
+const processSegments = async (segmentPaths: string[], transcriptId: number) => {
+  try {
+    let fullTranscription = '';
+
+    for (const segmentPath of segmentPaths) {
+      const segmentTranscription = await transcribeSegment(segmentPath);
+      fullTranscription += segmentTranscription + ' ';
+      // Excluir o segmento após transcrição
+      await fsPromises.unlink(segmentPath);
+    }
+
+    // Atualiza a transcrição completa no banco de dados
+    await prisma.transcript.update({
+      where: { id: transcriptId },
+      data: {
+        status: 'Concluído',
+        text: fullTranscription.trim(),
+        completedAt: new Date(),
+      },
+    });
+
+    // Excluir o arquivo de áudio original após transcrição
+    const originalAudioPath = path.join(path.dirname(segmentPaths[0]), `${path.parse(segmentPaths[0]).name.split('_segment_')[0]}.wav`);
+    await fsPromises.unlink(originalAudioPath);
+  } catch (error) {
+    console.error('Erro na transcrição dos segmentos:', error);
+    await prisma.transcript.update({
+      where: { id: transcriptId },
+      data: { status: 'Erro' },
+    });
+  }
 };
 
 // Função para processar o vídeo de forma assíncrona
@@ -81,38 +143,33 @@ const processVideo = async (transcriptId: number, file: File) => {
     const filePath = file.filepath;
     const filename = file.originalFilename;
 
-    const audioPath = path.join(path.dirname(filePath), `${filename}.mp3`);
+    const audioPath = path.join(path.dirname(filePath), `${filename}.wav`);
     await convertVideoToAudio(filePath, audioPath);
 
-    const transcription = await whisper(audioPath);
+    // Definir a duração dos segmentos em segundos (exemplo: 5 minutos)
+    const segmentDuration = 300; // 5 minutos
 
-    await prisma.transcript.update({
-      where: { id: transcriptId }, 
-        data: {
-          status: 'Concluído',
-          text: transcription.text,
-          completedAt: new Date(),
-        }
-    });
+    // Dividir o áudio em segmentos
+    const segmentPaths = await splitAudio(audioPath, segmentDuration);
 
-    await fsPromises.unlink(filePath);
-    await fsPromises.unlink(audioPath);
+    if (segmentPaths.length === 0) {
+      throw new Error('Nenhum segmento criado.');
+    }
+
+    // Transcrever os segmentos e combinar as transcrições
+    await processSegments(segmentPaths, transcriptId);
   } catch (error) {
-    console.error('Erro no processamento do vídeo: ', error);
+    console.error('Erro no processamento do vídeo:', error);
     await prisma.transcript.update({
-      where: { 
-        id: transcriptId
-      },
-      data: { 
-        status: 'Erro', 
-      },
+      where: { id: transcriptId },
+      data: { status: 'Erro' },
     });
   }
-}
+};
 
 // Função principal para processar e transcrever o vídeo
 export default async function POST(req: NextApiRequest, res: NextApiResponse) {
-  if(req.method !== 'POST') {
+  if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ status: 'fail', error: 'Método não permitido.' });
   }
@@ -124,31 +181,12 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
 
     // Verifica se o usuário existe e se a cota de transcrições não foi excedida
     const user = await prisma.user.findUnique({
-      where: { 
-        id: userId 
-      },
+      where: { id: userId },
     });
-
-    if(!user) {
-      return res.status(400).json({ status: 'fail', error: 'Usuário não encontrado.' });
+    if (!user) {
+      return res.status(404).json({ status: 'fail', error: 'Usuário não encontrado.' });
     }
-
-    // Atualiza a cota do usuário se o último uso foi há mais de 1 minuto
-    // const minTime = new Date(Date.now() - 24*60*60*1000);
-    const minTime = new Date(Date.now() - 60*1000);
-    if(user.lastUsedAt && user.lastUsedAt < minTime) {
-      await prisma.user.update({
-        where: { 
-          id: userId 
-        },
-        data: { 
-          quota: 5,
-          lastUsedAt: new Date(),
-        },
-      });
-    }
-
-    if(user.quota <= 0) {
+    if (user.quota <= 0) {
       return res.status(400).json({ status: 'fail', error: 'Cota de transcrições excedida.' });
     }
 
@@ -176,7 +214,7 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ status: 'fail', error: 'Arquivo não encontrado.' });
     }
 
-    // Salva o arquivo no banco de dados
+    // Salva o arquivo no banco de dados com status 'Processando'
     const savedTranscript = await prisma.transcript.create({
       data: {
         userId: userId,
@@ -188,12 +226,8 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
 
     // Atualiza a cota do usuário
     await prisma.user.update({
-      where: { 
-        id: userId 
-      },
-      data: { 
-        quota: user.quota - 1 
-      },
+      where: { id: userId },
+      data: { quota: user.quota - 1 },
     });
 
     res.status(200).json({ 
@@ -201,10 +235,11 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
       data: savedTranscript 
     });
 
+    // Processar o vídeo assincronamente
     setTimeout(() => processVideo(savedTranscript.id, file), 0);
 
   } catch (error) {
-    console.error('Erro ao iniciar o processamento: ', error);
+    console.error('Erro ao iniciar o processamento:', error);
     res.status(500).json({ status: 'fail', error: (error as Error).message });
   }
 }
