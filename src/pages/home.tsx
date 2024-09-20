@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
 import { signOut } from 'firebase/auth';
@@ -25,7 +25,9 @@ export default function Home() {
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
   const [error, setError] = useState<string>('');
 
-  const fetchTranscripts = async () => {
+  // Função para buscar as transcrições do usuário
+  // useCallback é utilizado para evitar que a função seja recriada a cada renderização
+  const fetchTranscripts = useCallback(async () => {
     const token = localStorage.getItem('token');
 
     if (!token) {
@@ -55,11 +57,11 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  } , [router]);
 
   useEffect(() => {
     fetchTranscripts();
-  }, []);
+  }, [fetchTranscripts]);
 
   const onSubmit = async (data: FormData) => {
     const formData = new FormData();
@@ -83,8 +85,14 @@ export default function Home() {
 
     if(!response.ok) {
       const errorData = await response.json();
-      if(response.status === 400 && errorData.error) {
-        setError('Cota de transcrições excedida. Tente novamente outro dia.');
+      if(response.status === 400) {
+        if(errorData.error === 'Cota de transcrições excedida.'){
+          setError('Cota de transcrições excedida. Tente novamente outro dia.');
+        } else if(errorData.error === 'Formato de arquivo não suportado.'){
+          setError('Formato de arquivo não suportado. Envie um arquivo de vídeo.');
+        } else {
+          setError('Nenhum arquivo enviado.');
+        }
       } else {
         setError('Erro ao fazer upload do arquivo.');
       }
@@ -136,7 +144,8 @@ export default function Home() {
     link.href = url;
 
     // Define o nome do arquivo para download
-    link.setAttribute('download', `transcript_${id}.txt`);
+    const name = transcripts.find((transcript) => transcript.id === id)?.name.split('.')[0] || 'transcript';
+    link.setAttribute('download', `transcript_${name}.txt`);
 
     // Adiciona o link ao corpo do documento
     document.body.appendChild(link);
@@ -161,10 +170,10 @@ export default function Home() {
           <input 
             type="file" 
             {...register('file')}
-            accept='video/*'
+            accept='video/*,audio/*' // Aceita arquivos de vídeo e áudio
             multiple={false}
             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
+            />
           {errors.file && <p>{errors.file.message}</p>}
           <button type="submit" className="w-full bg-blue-500 text-white py-2 mt-4 rounded-md hover:bg-blue-600 transition font-semibold">Upload</button>
         </form>
@@ -173,26 +182,26 @@ export default function Home() {
           {loading ? (
             <p>Carregando transcrições...</p>
           ) : (
-            <table className="table-auto w-full bg-white shadow-md rounded-lg overflow-hidden">
+            <table className="table-auto w-full bg-white shadow-md rounded-lg overflow-hidden text-center">
               <thead>
-                <tr className="bg-customWhite">
-                  <th className="px-4 py-2">Nome</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Data de Conclusão</th>
-                  <th className="px-4 py-2">Download</th>
-                </tr>
+              <tr className="bg-customWhite border-b">
+                <th className="px-4 py-2 border-r">Nome</th>
+                <th className="px-4 py-2 border-r">Status</th>
+                <th className="px-4 py-2 border-r">Data de Conclusão</th>
+                <th className="px-4 py-2">Download</th>
+              </tr>
               </thead>
               <tbody>
-                {transcripts.map((transcript) => (
-                  <tr key={transcript.id} className="border-t">
-                    <td className="px-4 py-2">{transcript.name}</td>
-                    <td className="px-4 py-2">{transcript.status}</td>
-                    <td className="px-4 py-2">{transcript.completedAt ? transcript.completedAt.toLocaleString() : 'Em processamento'}</td>
-                    <td>
-                      <button onClick={() => handleDownload(transcript.id)} className="w-full bg-blue-500 text-white py-1 rounded-md hover:bg-blue-600 transition font-semibold">Download</button>
-                    </td>
-                  </tr>
-                ))}
+              {transcripts.map((transcript) => (
+                <tr key={transcript.id} className="border-t border-b">
+                <td className="px-4 py-2 border-r">{transcript.name}</td>
+                <td className="px-4 py-2 border-r">{transcript.status}</td>
+                <td className="px-4 py-2 border-r">{transcript.completedAt ? transcript.completedAt.toLocaleString() : 'Em processamento'}</td>
+                <td>
+                  <button onClick={() => handleDownload(transcript.id)} className="w-100 bg-blue-500 text-white py-1 rounded-md hover:bg-blue-600 transition font-semibold">Download</button>
+                </td>
+                </tr>
+              ))}
               </tbody>
             </table>
           )}

@@ -65,6 +65,16 @@ const parseForm = async (req: NextApiRequest): Promise<{fields: Fields, files: F
   });
 };
 
+const whisper = async (audioPath: string) => {
+  const transcription = await openai.audio.transcriptions.create({
+    model: 'whisper-1',
+    file: fs.createReadStream(audioPath),
+    response_format: 'verbose_json',
+    timestamp_granularities: ['word'],
+  });
+  return transcription;
+};
+
 // Função para processar o vídeo de forma assíncrona
 const processVideo = async (transcriptId: number, file: File) => {
   try {
@@ -74,24 +84,19 @@ const processVideo = async (transcriptId: number, file: File) => {
     const audioPath = path.join(path.dirname(filePath), `${filename}.wav`);
     await convertVideoToAudio(filePath, audioPath);
 
-    const transcription = await openai.audio.transcriptions.create({
-      model: 'whisper-1',
-      file: fs.createReadStream(audioPath),
-      response_format: 'verbose_json',
-      timestamp_granularities: ['word'],
-  });
+    const transcription = await whisper(audioPath);
 
-  await prisma.transcript.update({
-    where: { id: transcriptId }, 
-      data: {
-        status: 'Concluído',
-        text: transcription.text,
-        completedAt: new Date(),
-      }
-  });
+    await prisma.transcript.update({
+      where: { id: transcriptId }, 
+        data: {
+          status: 'Concluído',
+          text: transcription.text,
+          completedAt: new Date(),
+        }
+    });
 
-  await fsPromises.unlink(filePath);
-  await fsPromises.unlink(audioPath);
+    await fsPromises.unlink(filePath);
+    await fsPromises.unlink(audioPath);
   } catch (error) {
     console.error('Erro no processamento do vídeo: ', error);
     await prisma.transcript.update({
@@ -119,9 +124,26 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
         id: userId 
       },
     });
+
     if(!user) {
-      return res.status(404).json({ status: 'fail', error: 'Usuário não encontrado.' });
+      return res.status(400).json({ status: 'fail', error: 'Usuário não encontrado.' });
     }
+
+    // Atualiza a cota do usuário se o último uso foi há mais de 1 minuto
+    // const minTime = new Date(Date.now() - 24*60*60*1000);
+    const minTime = new Date(Date.now() - 60*1000);
+    if(user.lastUsedAt && user.lastUsedAt < minTime) {
+      await prisma.user.update({
+        where: { 
+          id: userId 
+        },
+        data: { 
+          quota: 5,
+          lastUsedAt: new Date(),
+        },
+      });
+    }
+
     if(user.quota <= 0) {
       return res.status(400).json({ status: 'fail', error: 'Cota de transcrições excedida.' });
     }
@@ -137,7 +159,7 @@ export default async function POST(req: NextApiRequest, res: NextApiResponse) {
     const file = fileArray[0];
 
     // Verifica a extensão do arquivo
-    const validExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+    const validExtensions = ['mp3', 'mp4', 'mov', 'avi', 'mkv', 'webm'];
     const fileExtension = path.extname(file.originalFilename || '').slice(1).toLowerCase();
     if (!validExtensions.includes(fileExtension)) {
       return res.status(400).json({ status: 'fail', error: 'Formato de arquivo não suportado.' });
